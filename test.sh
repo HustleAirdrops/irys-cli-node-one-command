@@ -861,21 +861,23 @@ view_change_config() {
     echo -ne "${CYAN}❓ Do you want to update the config? (y/n): ${NC}"
     read confirm
 
-
     if [[ "$confirm" =~ ^[yY]$ ]]; then
         echo -e "\n${BLUE}✏️  Updating Config...${NC}\n"
 
-        read -p "$(echo -e ${CYAN}🔑 Enter new Private Key (press enter to keep current): ${NC})" new_pk
+        echo -ne "${CYAN}🔑 Enter new Private Key (press enter to keep current): ${NC}"
+        read new_pk
         if [ -n "$new_pk" ]; then
             PRIVATE_KEY="${new_pk#0x}"
         fi
 
-        read -p "$(echo -e ${CYAN}🌐 Enter new RPC URL (press enter to keep current): ${NC})" new_rpc
+        echo -ne "${CYAN}🌐 Enter new RPC URL (press enter to keep current): ${NC}"
+        read new_rpc
         if [ -n "$new_rpc" ]; then
             RPC_URL="$new_rpc"
         fi
 
-        read -p "$(echo -e ${CYAN}👛 Enter new Wallet Address (press enter to keep current): ${NC})" new_wa
+        echo -ne "${CYAN}👛 Enter new Wallet Address (press enter to keep current): ${NC}"
+        read new_wa
         if [ -n "$new_wa" ]; then
             WALLET_ADDRESS="$new_wa"
         fi
@@ -886,6 +888,7 @@ view_change_config() {
         echo -e "\n${YELLOW}⚠️  No changes made.${NC}\n"
     fi
 }
+
 
 
 return_to_menu() {
