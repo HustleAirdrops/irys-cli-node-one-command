@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#AAAA
 # Trap for smooth exit on Ctrl+C
 trap 'echo -e "${RED}Exiting gracefully...${NC}"; exit 0' INT
 
@@ -717,7 +717,8 @@ upload_file() {
                     echo "$api_key" > "$API_KEY_FILE"
                     echo -e "${GREEN}✅ Pixabay API key saved to $API_KEY_FILE. 💾${NC}"
                 fi
-                read -p "$(echo -e ${CYAN}🔍 Enter a search query for the video (e.g., 'nature'): ${NC})" query
+                read -p "$(echo -e "${CYAN}🔍 Enter a search query for the video (e.g., 'nature'): ${NC}") " query
+
                 echo -e "${BLUE}📥 Downloading video from Pixabay... 🌟${NC}"
                 random_suffix=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
                 output_file="video_$random_suffix.mp4"
