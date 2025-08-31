@@ -689,7 +689,7 @@ upload_file() {
         fi
         case $source_type in
             youtube)
-                read -p "$(echo -e ${CYAN}🔍 Enter a search query for the video (e.g., 'random full hd'): ${NC})" query
+                read -p "$(echo -e "${CYAN}🔍 Enter a search query for the video (e.g., 'random full hd'): ${NC}") " query
                 echo -e "${BLUE}📥 Downloading video from YouTube... 🎬${NC}"
                 random_suffix=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
                 output_file="video_$random_suffix.mp4"
@@ -761,7 +761,7 @@ upload_file() {
                     echo "$api_key" > "$API_KEY_FILE"
                     echo -e "${GREEN}✅ Pexels API key saved to $API_KEY_FILE. 💾${NC}"
                 fi
-                read -p "$(echo -e ${CYAN}🔍 Enter a search query for the video (e.g., 'nature'): ${NC})" query
+                read -p "$(echo -e "${CYAN}🔍 Enter a search query for the video (e.g., 'nature'): ${NC}") " query
                 echo -e "${BLUE}📥 Downloading video from Pexels... ✨${NC}"
                 random_suffix=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
                 output_file="video_$random_suffix.mp4"
