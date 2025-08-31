@@ -1,5 +1,5 @@
 #!/bin/bash
-# Trap for smooth exit on Ctrl+C AAAA
+# Trap for smooth exit on Ctrl+C 
 trap 'echo -e "${RED}Exiting gracefully...${NC}"; exit 0' INT
 
 # Color definitions
@@ -289,6 +289,8 @@ def download_videos(query, output_file, target_size_mb=1000):
         total_size = 0
         total_downloaded = 0
         overall_start_time = time.time()
+        min_filesize = 50 * 1024 * 1024
+        target_bytes = target_size_mb * 1024 * 1024
         for i, v in enumerate(videos):
             video_url = v['videos'].get('large', {}).get('url') or v['videos'].get('medium', {}).get('url')
             if not video_url:
@@ -298,7 +300,12 @@ def download_videos(query, output_file, target_size_mb=1000):
             file_start_time = time.time()
             resp = requests.get(video_url, stream=True, timeout=10)
             size = int(resp.headers.get('content-length', 0))
-            if size < 50 * 1024 * 1024:
+            remaining = target_bytes - total_size
+            if size < min_filesize:
+                print(f"Skipping small video: {format_size(size)} < 50 MB")
+                continue
+            if size > remaining:
+                print(f"Skipping large video: {format_size(size)} > remaining {format_size(remaining)}")
                 continue
             with open(filename, 'wb') as f:
                 downloaded = 0
@@ -322,7 +329,7 @@ def download_videos(query, output_file, target_size_mb=1000):
             total_size += file_size
             total_downloaded += file_size
             downloaded_files.append(filename)
-            if total_size >= target_size_mb * 1024 * 1024:
+            if total_size >= target_bytes:
                 break
         if not downloaded_files:
             print("⚠️ No suitable videos downloaded.")
@@ -458,6 +465,8 @@ def download_videos(query, output_file, target_size_mb=1000):
         total_size = 0
         total_downloaded = 0
         overall_start_time = time.time()
+        min_filesize = 50 * 1024 * 1024
+        target_bytes = target_size_mb * 1024 * 1024
         for i, v in enumerate(videos):
             video_files = v.get('video_files', [])
             video_url = None
@@ -472,7 +481,12 @@ def download_videos(query, output_file, target_size_mb=1000):
             file_start_time = time.time()
             resp = requests.get(video_url, stream=True, timeout=10)
             size = int(resp.headers.get('content-length', 0))
-            if size < 50 * 1024 * 1024:
+            remaining = target_bytes - total_size
+            if size < min_filesize:
+                print(f"Skipping small video: {format_size(size)} < 50 MB")
+                continue
+            if size > remaining:
+                print(f"Skipping large video: {format_size(size)} > remaining {format_size(remaining)}")
                 continue
             with open(filename, 'wb') as f:
                 downloaded = 0
@@ -496,7 +510,7 @@ def download_videos(query, output_file, target_size_mb=1000):
             total_size += file_size
             total_downloaded += file_size
             downloaded_files.append(filename)
-            if total_size >= target_size_mb * 1024 * 1024:
+            if total_size >= target_bytes:
                 break
         if not downloaded_files:
             print("⚠️ No suitable videos downloaded.")
@@ -610,7 +624,7 @@ install_node() {
     fi
     ask_details
     echo -e "${YELLOW}⚠️ Please claim faucet for devnet now. 💰${NC}"
-    read -p "$(echo -e ${YELLOW}Press enter after claiming faucet...${NC})"
+    read -p "${YELLOW}Press enter after claiming faucet...${NC}"
     add_fund
 }
 
@@ -641,7 +655,7 @@ get_balance_eth() {
 upload_file() {
     ask_details
     source "$VENV_DIR/bin/activate"
-    available_sources=("manual" "youtube" "pixabay" "pexels")
+    available_sources=("youtube" "pixabay" "pexels" "picsum" "manual")
     if [ ${#available_sources[@]} -eq 1 ]; then
         echo -e "${YELLOW}⚠️ No download sources available (yt-dlp or requests not installed). Only manual upload is available. 📁${NC}"
     fi
@@ -663,12 +677,13 @@ upload_file() {
                 "youtube") echo -e "${YELLOW}$((i+1)). 📹 Upload from YouTube (yt-dlp) 🚀${NC}" ;;
                 "pixabay") echo -e "${YELLOW}$((i+1)). 🎥 Upload from Pixabay 🌈${NC}" ;;
                 "pexels") echo -e "${YELLOW}$((i+1)). 📽️ Upload from Pexels ✨${NC}" ;;
+                "picsum") echo -e "${YELLOW}$((i+1)). 📸 Upload from Picsum (random placeholder images) 🖼️${NC}" ;;
                 "manual") echo -e "${YELLOW}$((i+1)). 🗂️ Manual Upload (from home or pipe folder) 📂${NC}" ;;
             esac
         done
         echo -e "${YELLOW}$(( ${#available_sources[@]} + 1 )). 🔙 Back to Main Menu ⏪${NC}"
         echo -e "${PURPLE}===================================================================${NC}"
-        read -p "$(echo -e ${CYAN}Select an option: ${NC})" subchoice
+        read -p "${CYAN}Select an option: ${NC}" subchoice
         if [ "$subchoice" -eq $(( ${#available_sources[@]} + 1 )) ] 2>/dev/null; then
             deactivate
             return
@@ -680,16 +695,16 @@ upload_file() {
         fi
         source_type=${available_sources[$((subchoice-1))]}
         balance_eth=$(get_balance_eth)
-        if [ "$source_type" != "manual" ]; then
+        if [ "$source_type" != "manual" ] && [ "$source_type" != "picsum" ]; then
             max_mb=$(awk "BEGIN {print int(($balance_eth / 0.0012) * 100)}")
             echo -e "${YELLOW}Based on your balance (${balance_eth} ETH), you can upload approximately ${max_mb} MB.${NC}"
-            read -p "$(echo -e ${CYAN}Enter target video size in MB: ${NC})" target_size_mb
+            read -p "${CYAN}Enter target video size in MB: ${NC}" target_size_mb
             estimated_cost=$(awk "BEGIN {print ($target_size_mb / 100) * 0.0012}")
             echo -e "${YELLOW}Estimated cost for ${target_size_mb} MB upload: ~${estimated_cost} ETH${NC}"
             echo -e "${YELLOW}Your current balance: ${balance_eth} ETH${NC}"
             if [ "$(awk "BEGIN {if ($balance_eth < $estimated_cost) print 1; else print 0}")" = "1" ]; then
                 echo -e "${RED}⚠️ Insufficient balance. You have approximately ${balance_eth} ETH, but need ~${estimated_cost} ETH.${NC}"
-                read -p "$(echo -e "${CYAN}Do you want to continue anyway? (y/n): ${NC}") " continue_confirm
+                read -p "${CYAN}Do you want to continue anyway? (y/n): ${NC}" continue_confirm
                 if [[ ! "$continue_confirm" =~ ^[yY]$ ]]; then
                     return_to_menu
                     continue
@@ -698,7 +713,7 @@ upload_file() {
         fi
         case $source_type in
             youtube)
-                read -p "$(echo -e "${CYAN}🔍 Enter a search query for the video (e.g., 'random full hd'): ${NC}") " query
+                read -p "${CYAN}🔍 Enter a search query for the video (e.g., 'random full hd'): ${NC}" query
                 echo -e "${BLUE}📥 Downloading video from YouTube... 🎬${NC}"
                 random_suffix=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
                 output_file="video_$random_suffix.mp4"
@@ -717,7 +732,7 @@ upload_file() {
                 if [ ! -f "$API_KEY_FILE" ]; then
                     echo -e "${YELLOW}⚠️ Pixabay API key not found. Please provide a valid API key. 🔑${NC}"
                     while true; do
-                        read -p "$(echo -e ${CYAN}Enter your Pixabay API key: ${NC})" api_key
+                        read -p "${CYAN}Enter your Pixabay API key: ${NC}" api_key
                         if [ -n "$api_key" ] && [ ${#api_key} -ge 10 ]; then
                             break
                         else
@@ -727,7 +742,7 @@ upload_file() {
                     echo "$api_key" > "$API_KEY_FILE"
                     echo -e "${GREEN}✅ Pixabay API key saved to $API_KEY_FILE. 💾${NC}"
                 fi
-                read -p "$(echo -e "${CYAN}🔍 Enter a search query for the video (e.g., 'nature'): ${NC}") " query
+                read -p "${CYAN}🔍 Enter a search query for the video (e.g., 'nature'): ${NC}" query
                 echo -e "${BLUE}📥 Downloading video from Pixabay... 🌟${NC}"
                 random_suffix=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
                 output_file="video_$random_suffix.mp4"
@@ -738,7 +753,7 @@ upload_file() {
                     rm -f "$API_KEY_FILE" 2>/dev/null
                     echo -e "${YELLOW}⚠️ Please provide a valid API key. 🔑${NC}"
                     while true; do
-                        read -p "$(echo -e ${CYAN}Enter your Pixabay API key: ${NC})" api_key
+                        read -p "${CYAN}Enter your Pixabay API key: ${NC}" api_key
                         if [ -n "$api_key" ] && [ ${#api_key} -ge 10 ]; then
                             break
                         else
@@ -762,7 +777,7 @@ upload_file() {
                 if [ ! -f "$API_KEY_FILE" ]; then
                     echo -e "${YELLOW}⚠️ Pexels API key not found. Please provide a valid API key. 🔑${NC}"
                     while true; do
-                        read -p "$(echo -e ${CYAN}Enter your Pexels API key: ${NC})" api_key
+                        read -p "${CYAN}Enter your Pexels API key: ${NC}" api_key
                         if [ -n "$api_key" ] && [ ${#api_key} -ge 10 ]; then
                             break
                         else
@@ -772,7 +787,7 @@ upload_file() {
                     echo "$api_key" > "$API_KEY_FILE"
                     echo -e "${GREEN}✅ Pexels API key saved to $API_KEY_FILE. 💾${NC}"
                 fi
-                read -p "$(echo -e "${CYAN}🔍 Enter a search query for the video (e.g., 'nature'): ${NC}") " query
+                read -p "${CYAN}🔍 Enter a search query for the video (e.g., 'nature'): ${NC}" query
                 echo -e "${BLUE}📥 Downloading video from Pexels... ✨${NC}"
                 random_suffix=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
                 output_file="video_$random_suffix.mp4"
@@ -783,7 +798,7 @@ upload_file() {
                     rm -f "$API_KEY_FILE" 2>/dev/null
                     echo -e "${YELLOW}⚠️ Please provide a valid API key. 🔑${NC}"
                     while true; do
-                        read -p "$(echo -e ${CYAN}Enter your Pexels API key: ${NC})" api_key
+                        read -p "${CYAN}Enter your Pexels API key: ${NC}" api_key
                         if [ -n "$api_key" ] && [ ${#api_key} -ge 10 ]; then
                             break
                         else
@@ -794,6 +809,34 @@ upload_file() {
                     echo -e "${GREEN}✅ New Pexels API key saved to $API_KEY_FILE. Retrying download... 🔄${NC}"
                     python3 "$PEXELS_DOWNLOADER_PY" "$query" "$output_file" "$target_size_mb" 2>&1 | tee -a "$LOG_FILE"
                 fi
+                ;;
+            picsum)
+                read -p "${CYAN}Enter width (default 1920): ${NC}" width
+                width=${width:-1920}
+                read -p "${CYAN}Enter height (default 1080): ${NC}" height
+                height=${height:-1080}
+                read -p "${CYAN}Grayscale (y/n, default n): ${NC}" gs
+                gs=${gs:-n}
+                if [[ $gs =~ ^[yY]$ ]]; then grayscale="?grayscale"; else grayscale=""; fi
+                read -p "${CYAN}Blur (1-10, default 0): ${NC}" blur
+                blur=${blur:-0}
+                if [ $blur -gt 0 ] && [ $blur -le 10 ]; then 
+                    blur_param="&blur=$blur"
+                    if [ -z "$grayscale" ]; then blur_param="?blur=$blur"; fi
+                else 
+                    blur_param=""
+                fi
+                read -p "${CYAN}Seed (optional, for static random): ${NC}" seed
+                if [ -n "$seed" ]; then seed_path="/seed/$seed"; else seed_path=""; fi
+                url="https://picsum.photos$seed_path/$width/$height$grayscale$blur_param.jpg"
+                random_suffix=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
+                output_file="picsum_$random_suffix.jpg"
+                echo -e "${BLUE}📥 Downloading image from Picsum: $url ... 🖼️${NC}"
+                curl -L -o "$output_file" "$url" 2>&1 | tee -a "$LOG_FILE"
+                size_mb=$(du -m "$output_file" | cut -f1 2>/dev/null || echo 0)
+                estimated_cost=$(awk "BEGIN {print ($size_mb / 100) * 0.0012}")
+                echo -e "${YELLOW}Downloaded ${size_mb} MB, estimated cost ~${estimated_cost} ETH${NC}"
+                echo -e "${YELLOW}Your current balance: ${balance_eth} ETH${NC}"
                 ;;
             manual)
                 echo -e "${BLUE}🔍 Searching for .mp4 files in $HOME and $HOME/pipe... 🔎${NC}"
@@ -808,7 +851,7 @@ upload_file() {
                     size=$(du -h "${videos[i]}" | cut -f1)
                     echo "$((i+1)). ${videos[i]} ($size)"
                 done
-                read -p "$(echo -e ${CYAN}Select a number: ${NC})" num
+                read -p "${CYAN}Select a number: ${NC}" num
                 if [[ $num =~ ^[0-9]+$ ]] && [ $num -ge 1 ] && [ $num -le ${#videos[@]} ]; then
                     selected="${videos[$((num-1))]}"
                     output_file="${selected##*/}"
@@ -824,7 +867,7 @@ upload_file() {
                 echo -e "${YELLOW}Your current balance: ${balance_eth} ETH${NC}"
                 if [ "$(awk "BEGIN {if ($balance_eth < $estimated_cost) print 1; else print 0}")" = "1" ]; then
                     echo -e "${RED}⚠️ Insufficient balance. You have approximately ${balance_eth} ETH, but need ~${estimated_cost} ETH.${NC}"
-                    read -p "$(echo -e "${CYAN}Do you want to continue anyway? (y/n): ${NC}") " continue_confirm
+                    read -p "${CYAN}Do you want to continue anyway? (y/n): ${NC}" continue_confirm
 
                     if [[ ! "$continue_confirm" =~ ^[yY]$ ]]; then
                         return_to_menu
@@ -936,7 +979,7 @@ view_change_config() {
 
 
 return_to_menu() {
-    read -p "$(echo -e ${CYAN}Press enter to return to menu... ⏎${NC})"
+    read -p "${CYAN}Press enter to return to menu... ⏎${NC}"
 }
 
 # Main menu
@@ -954,7 +997,7 @@ main_menu() {
         echo -e "${YELLOW}5. ⚙️ View/Change Config${NC}"
         echo -e "${YELLOW}6. ❌ Exit${NC}"
         echo -e "${BLUE}=============================================================================${NC}"
-        read -p "$(echo -e ${CYAN}Select an option: ${NC})" choice
+        read -p "${CYAN}Select an option: ${NC}" choice
         case $choice in
             1) install_node; return_to_menu ;;
             2) upload_file ;;
@@ -967,4 +1010,4 @@ main_menu() {
     done
 }
 
-main_menu 
+main_menu
