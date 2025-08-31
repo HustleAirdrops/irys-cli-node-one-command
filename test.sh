@@ -683,7 +683,7 @@ upload_file() {
         done
         echo -e "${YELLOW}$(( ${#available_sources[@]} + 1 )). 🔙 Back to Main Menu ⏪${NC}"
         echo -e "${PURPLE}===================================================================${NC}"
-        read -p "${CYAN}Select an option: ${NC}" subchoice
+        read -p "$(echo -e ${CYAN}Select an option: ${NC})" subchoice
         if [ "$subchoice" -eq $(( ${#available_sources[@]} + 1 )) ] 2>/dev/null; then
             deactivate
             return
@@ -811,22 +811,10 @@ upload_file() {
                 fi
                 ;;
             picsum)
-                read -p "${CYAN}Enter width (default 1920): ${NC}" width
-                width=${width:-1920}
-                read -p "${CYAN}Enter height (default 1080): ${NC}" height
-                height=${height:-1080}
-                read -p "${CYAN}Grayscale (y/n, default n): ${NC}" gs
+                width=${width:-1920}              
+                height=${height:-1080}      
                 gs=${gs:-n}
-                if [[ $gs =~ ^[yY]$ ]]; then grayscale="?grayscale"; else grayscale=""; fi
-                read -p "${CYAN}Blur (1-10, default 0): ${NC}" blur
                 blur=${blur:-0}
-                if [ $blur -gt 0 ] && [ $blur -le 10 ]; then 
-                    blur_param="&blur=$blur"
-                    if [ -z "$grayscale" ]; then blur_param="?blur=$blur"; fi
-                else 
-                    blur_param=""
-                fi
-                read -p "${CYAN}Seed (optional, for static random): ${NC}" seed
                 if [ -n "$seed" ]; then seed_path="/seed/$seed"; else seed_path=""; fi
                 url="https://picsum.photos$seed_path/$width/$height$grayscale$blur_param.jpg"
                 random_suffix=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
