@@ -1,5 +1,5 @@
 #!/bin/bash
-# Trap for smooth exit on Ctrl+C 
+# Trap for smooth exit on Ctrl+C  AAAAAAAAA
 trap 'echo -e "${RED}Exiting gracefully...${NC}"; exit 0' INT
 
 # Color definitions
@@ -683,7 +683,8 @@ upload_file() {
         done
         echo -e "${YELLOW}$(( ${#available_sources[@]} + 1 )). 🔙 Back to Main Menu ⏪${NC}"
         echo -e "${PURPLE}===================================================================${NC}"
-        read -p "$(echo -e ${CYAN}Select an option: ${NC})" subchoice
+        echo -e ${CYAN}Select an option: ${NC}
+read subchoice
         if [ "$subchoice" -eq $(( ${#available_sources[@]} + 1 )) ] 2>/dev/null; then
             deactivate
             return
@@ -986,7 +987,8 @@ main_menu() {
         echo -e "${YELLOW}5. ⚙️ View/Change Config${NC}"
         echo -e "${YELLOW}6. ❌ Exit${NC}"
         echo -e "${BLUE}=============================================================================${NC}"
-        read -p "$(echo -e ${CYAN}Select an option: ${NC})" choice
+        echo -e ${CYAN}Select an option: ${NC}
+read choice
         case $choice in
             1) install_node; return_to_menu ;;
             2) upload_file ;;
@@ -999,4 +1001,4 @@ main_menu() {
     done
 }
 
-main_menu
+main_menu 
