@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Trap for smooth exit on Ctrl+C
+# Trap for smooth exit on Ctrl+C AAAAAAA
 trap 'echo -e "${RED}Exiting gracefully...${NC}"; exit 0' INT
 
 # Color definitions
