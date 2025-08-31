@@ -824,7 +824,8 @@ upload_file() {
                 echo -e "${YELLOW}Your current balance: ${balance_eth} ETH${NC}"
                 if [ "$(awk "BEGIN {if ($balance_eth < $estimated_cost) print 1; else print 0}")" = "1" ]; then
                     echo -e "${RED}⚠️ Insufficient balance. You have approximately ${balance_eth} ETH, but need ~${estimated_cost} ETH.${NC}"
-                    read -p "$(echo -e ${CYAN}Do you want to continue anyway? (y/n): ${NC})" continue_confirm
+                    read -p "$(echo -e "${CYAN}Do you want to continue anyway? (y/n): ${NC}") " continue_confirm
+
                     if [[ ! "$continue_confirm" =~ ^[yY]$ ]]; then
                         return_to_menu
                         continue
