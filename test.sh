@@ -997,7 +997,7 @@ main_menu() {
         echo -e "${YELLOW}5. ⚙️ View/Change Config${NC}"
         echo -e "${YELLOW}6. ❌ Exit${NC}"
         echo -e "${BLUE}=============================================================================${NC}"
-        read -p "${CYAN}Select an option: ${NC}" choice
+        read -p "$(echo -e ${CYAN}Select an option: ${NC})" choice
         case $choice in
             1) install_node; return_to_menu ;;
             2) upload_file ;;
