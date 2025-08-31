@@ -613,8 +613,11 @@ install_node() {
 add_fund() {
     ask_details
     echo -e "${BLUE}💸 Adding funds...${NC}"
-    irys fund 1000000 -n devnet -t ethereum -w "$PRIVATE_KEY" --provider-url "$RPC_URL" 2>&1 | tee -a "$LOG_FILE"
+    read -p "$(echo -e ${CYAN}Enter amount in ETH to deposit: ${NC})" eth_amount
+    amount=$(awk "BEGIN {printf \"%.0f\n\", $eth_amount * 1000000000000000000}")
+    irys fund "$amount" -n devnet -t ethereum -w "$PRIVATE_KEY" --provider-url "$RPC_URL" 2>&1 | tee -a "$LOG_FILE"
 }
+
 
 # Check balance
 check_balance() {
