@@ -1,5 +1,6 @@
 #!/bin/bash
 # Trap for smooth exit on Ctrl+C
+#ASASAS
 trap 'echo -e "${RED}Exiting gracefully...${NC}"; exit 0' INT
 
 # Color definitions
@@ -641,9 +642,7 @@ get_balance_eth() {
 upload_file() {
     ask_details
     source "$VENV_DIR/bin/activate"
-    available_sources=("manual")
-    if pip show yt-dlp >/dev/null 2>&1; then available_sources+=("youtube"); fi
-    if pip show requests >/dev/null 2>&1; then available_sources+=("pixabay" "pexels"); fi
+    available_sources=("manual" "youtube" "pixabay" "pexels")
     if [ ${#available_sources[@]} -eq 1 ]; then
         echo -e "${YELLOW}⚠️ No download sources available (yt-dlp or requests not installed). Only manual upload is available. 📁${NC}"
     fi
@@ -681,10 +680,22 @@ upload_file() {
             continue
         fi
         source_type=${available_sources[$((subchoice-1))]}
-        size_mb=0
+        balance_eth=$(get_balance_eth)
         if [ "$source_type" != "manual" ]; then
+            max_mb=$(awk "BEGIN {print int(($balance_eth / 0.0012) * 100)}")
+            echo -e "${YELLOW}Based on your balance (${balance_eth} ETH), you can upload approximately ${max_mb} MB.${NC}"
             read -p "$(echo -e ${CYAN}Enter target video size in MB: ${NC})" target_size_mb
-            size_mb="$target_size_mb"
+            estimated_cost=$(awk "BEGIN {print ($target_size_mb / 100) * 0.0012}")
+            echo -e "${YELLOW}Estimated cost for ${target_size_mb} MB upload: ~${estimated_cost} ETH${NC}"
+            echo -e "${YELLOW}Your current balance: ${balance_eth} ETH${NC}"
+            if [ "$(awk "BEGIN {if ($balance_eth < $estimated_cost) print 1; else print 0}")" = "1" ]; then
+                echo -e "${RED}⚠️ Insufficient balance. You have approximately ${balance_eth} ETH, but need ~${estimated_cost} ETH.${NC}"
+                read -p "$(echo -e ${CYAN}Do you want to continue anyway? (y/n): ${NC})" continue_confirm
+                if [[ ! "$continue_confirm" =~ ^[yY]$ ]]; then
+                    return_to_menu
+                    continue
+                fi
+            fi
         fi
         case $source_type in
             youtube)
@@ -693,6 +704,7 @@ upload_file() {
                 random_suffix=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
                 output_file="video_$random_suffix.mp4"
                 python3 "$VIDEO_DOWNLOADER_PY" "$query" "$output_file" "$target_size_mb" 2>&1 | tee -a "$LOG_FILE"
+                size_mb=$(du -m "$output_file" | cut -f1 2>/dev/null || echo 0)
                 ;;
             pixabay)
                 API_KEY_FILE="$HOME/.pixabay_api_key"
@@ -717,11 +729,11 @@ upload_file() {
                     echo -e "${GREEN}✅ Pixabay API key saved to $API_KEY_FILE. 💾${NC}"
                 fi
                 read -p "$(echo -e "${CYAN}🔍 Enter a search query for the video (e.g., 'nature'): ${NC}") " query
-
                 echo -e "${BLUE}📥 Downloading video from Pixabay... 🌟${NC}"
                 random_suffix=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
                 output_file="video_$random_suffix.mp4"
                 python3 "$PIXABAY_DOWNLOADER_PY" "$query" "$output_file" "$target_size_mb" 2>&1 | tee -a "$LOG_FILE"
+                size_mb=$(du -m "$output_file" | cut -f1 2>/dev/null || echo 0)
                 if grep -q "API key invalid" "$LOG_FILE" 2>/dev/null; then
                     echo -e "${YELLOW}⚠️ Invalid Pixabay API key detected. Deleting $API_KEY_FILE...${NC}"
                     rm -f "$API_KEY_FILE" 2>/dev/null
@@ -766,6 +778,7 @@ upload_file() {
                 random_suffix=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
                 output_file="video_$random_suffix.mp4"
                 python3 "$PEXELS_DOWNLOADER_PY" "$query" "$output_file" "$target_size_mb" 2>&1 | tee -a "$LOG_FILE"
+                size_mb=$(du -m "$output_file" | cut -f1 2>/dev/null || echo 0)
                 if grep -q "API key invalid" "$LOG_FILE" 2>/dev/null; then
                     echo -e "${YELLOW}⚠️ Invalid Pexels API key detected. Deleting $API_KEY_FILE...${NC}"
                     rm -f "$API_KEY_FILE" 2>/dev/null
@@ -807,6 +820,17 @@ upload_file() {
                     return_to_menu
                     continue
                 fi
+                estimated_cost=$(awk "BEGIN {print ($size_mb / 100) * 0.0012}")
+                echo -e "${YELLOW}Estimated cost for ${size_mb} MB upload: ~${estimated_cost} ETH${NC}"
+                echo -e "${YELLOW}Your current balance: ${balance_eth} ETH${NC}"
+                if [ "$(awk "BEGIN {if ($balance_eth < $estimated_cost) print 1; else print 0}")" = "1" ]; then
+                    echo -e "${RED}⚠️ Insufficient balance. You have approximately ${balance_eth} ETH, but need ~${estimated_cost} ETH.${NC}"
+                    read -p "$(echo -e ${CYAN}Do you want to continue anyway? (y/n): ${NC})" continue_confirm
+                    if [[ ! "$continue_confirm" =~ ^[yY]$ ]]; then
+                        return_to_menu
+                        continue
+                    fi
+                fi
                 ;;
         esac
         if [ -f "$output_file" ] || [ "$source_type" = "manual" ]; then
@@ -814,23 +838,6 @@ upload_file() {
                 file_to_upload="$selected"
             else
                 file_to_upload="$output_file"
-                size_mb=$(du -m "$file_to_upload" | cut -f1)  # Get actual size after download
-            fi
-            balance_eth=$(get_balance_eth)
-            estimated_cost=$(awk "BEGIN {print ($size_mb / 100) * 0.0012}")
-            echo -e "${YELLOW}Estimated cost for ${size_mb} MB upload: ~${estimated_cost} ETH${NC}"
-            echo -e "${YELLOW}Your current balance: ${balance_eth} ETH${NC}"
-            if [ "$(echo "$balance_eth < $estimated_cost" | bc -l)" = "1" ]; then
-                echo -e "${RED}⚠️ Insufficient balance. You have approximately ${balance_eth} ETH, but need ~${estimated_cost} ETH.${NC}"
-                echo -ne "${CYAN}Do you want to continue anyway? (y/n): ${NC}"
-                read continue_confirm
-                if [[ ! "$continue_confirm" =~ ^[yY]$ ]]; then
-                    if [ "$source_type" != "manual" ]; then
-                        rm -f "$output_file" 2>/dev/null
-                    fi
-                    return_to_menu
-                    continue
-                fi
             fi
             echo -e "${BLUE}⬆️ Uploading video to Irys... 🚀${NC}"
             retries=0
@@ -883,7 +890,6 @@ upload_file() {
     done
     deactivate
 }
-
 view_change_config() {
     load_config
     masked_pk="${PRIVATE_KEY:0:6}...${PRIVATE_KEY: -4}"
