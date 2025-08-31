@@ -200,7 +200,8 @@ def progress_hook(d):
 
 if __name__ == "__main__":
     if len(sys.argv) > 2:
-        download_videos(sys.argv[1], sys.argv[2])
+        target_size_mb = int(sys.argv[3]) if len(sys.argv) > 3 else 1000
+        download_videos(sys.argv[1], sys.argv[2], target_size_mb=target_size_mb)
     else:
         print("Please provide a search query and output filename.")
 EOF
@@ -367,7 +368,8 @@ def download_videos(query, output_file, target_size_mb=1000):
 
 if __name__ == "__main__":
     if len(sys.argv) > 2:
-        download_videos(sys.argv[1], sys.argv[2])
+        target_size_mb = int(sys.argv[3]) if len(sys.argv) > 3 else 1000
+        download_videos(sys.argv[1], sys.argv[2], target_size_mb=target_size_mb)
     else:
         print("Please provide a search query and output filename.")
 EOF
@@ -540,7 +542,8 @@ def download_videos(query, output_file, target_size_mb=1000):
 
 if __name__ == "__main__":
     if len(sys.argv) > 2:
-        download_videos(sys.argv[1], sys.argv[2])
+        target_size_mb = int(sys.argv[3]) if len(sys.argv) > 3 else 1000
+        download_videos(sys.argv[1], sys.argv[2], target_size_mb=target_size_mb)
     else:
         print("Please provide a search query and output filename.")
 EOF
@@ -577,13 +580,16 @@ save_config() {
 ask_details() {
     load_config
     if [ -z "$PRIVATE_KEY" ] || [ -z "$RPC_URL" ]; then
-        read -p "$(echo -e ${CYAN}🔑 Enter Private Key \(with or without 0x\): ${NC})" pk
+        echo -ne "${CYAN}🔑 Enter Private Key (with or without 0x): ${NC}"
+        read pk
         PRIVATE_KEY="${pk#0x}"
-        read -p "$(echo -e ${CYAN}🌐 Enter RPC URL: ${NC})" RPC_URL
+        echo -ne "${CYAN}🌐 Enter RPC URL: ${NC}"
+        read RPC_URL
         save_config
     fi
     if [ -z "$WALLET_ADDRESS" ]; then
-        read -p "$(echo -e ${CYAN}💼 Enter Wallet Address: ${NC})" WALLET_ADDRESS
+        echo -ne "${CYAN}💼 Enter Wallet Address: ${NC}"
+        read WALLET_ADDRESS
         save_config
     fi
 }
@@ -596,7 +602,7 @@ install_node() {
     fi
     echo -e "${BLUE}🚀 Installing dependencies and Irys CLI...${NC}"
     sudo apt-get update && sudo apt-get upgrade -y 2>&1 | tee -a "$LOG_FILE"
-    sudo apt install curl iptables build-essential git wget lz4 jq make protobuf-compiler cmake gcc nano automake autoconf tmux htop nvme-cli libgbm1 pkg-config libssl-dev libleveldb-dev tar clang bsdmainutils ncdu unzip libleveldb-dev screen ufw figlet -y 2>&1 | tee -a "$LOG_FILE"
+    sudo apt install curl iptables build-essential git wget lz4 jq make protobuf-compiler cmake gcc nano automake autoconf tmux htop nvme-cli libgbm1 pkg-config libssl-dev libleveldb-dev tar clang bsdmainutils ncdu unzip libleveldb-dev screen ufw figlet bc -y 2>&1 | tee -a "$LOG_FILE"
     curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt install -y nodejs 2>&1 | tee -a "$LOG_FILE"
     sudo npm i -g @irys/cli 2>&1 | tee -a "$LOG_FILE"
     if ! command -v irys >/dev/null 2>&1; then
@@ -613,7 +619,8 @@ install_node() {
 add_fund() {
     ask_details
     echo -e "${BLUE}💸 Adding funds...${NC}"
-    read -p "$(echo -e ${CYAN}Enter amount in ETH to deposit: ${NC})" eth_amount
+    echo -ne "${CYAN}Enter amount in ETH to deposit: ${NC}"
+    read eth_amount
     amount=$(awk "BEGIN {printf \"%.0f\n\", $eth_amount * 1000000000000000000}")
     irys fund "$amount" -n devnet -t ethereum -w "$PRIVATE_KEY" --provider-url "$RPC_URL" 2>&1 | tee -a "$LOG_FILE"
 }
@@ -624,6 +631,11 @@ check_balance() {
     ask_details
     echo -e "${BLUE}📊 Checking balance...${NC}"
     irys balance "$WALLET_ADDRESS" -t ethereum -n devnet --provider-url "$RPC_URL" 2>&1 | tee -a "$LOG_FILE"
+}
+
+get_balance_eth() {
+    balance_output=$(irys balance "$WALLET_ADDRESS" -t ethereum -n devnet --provider-url "$RPC_URL" 2>&1)
+    echo "$balance_output" | grep -oP '(?<=\()[0-9.]+(?= ethereum\))' || echo "0"
 }
 
 # Upload file function with submenu
@@ -670,13 +682,18 @@ upload_file() {
             continue
         fi
         source_type=${available_sources[$((subchoice-1))]}
+        size_mb=0
+        if [ "$source_type" != "manual" ]; then
+            read -p "$(echo -e ${CYAN}Enter target video size in MB: ${NC})" target_size_mb
+            size_mb="$target_size_mb"
+        fi
         case $source_type in
             youtube)
-                read -p "$(echo -e ${CYAN}🔍 Enter a search query for the video \(e.g., 'random full hd'\): ${NC})" query
+                read -p "$(echo -e ${CYAN}🔍 Enter a search query for the video (e.g., 'random full hd'): ${NC})" query
                 echo -e "${BLUE}📥 Downloading video from YouTube... 🎬${NC}"
                 random_suffix=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
                 output_file="video_$random_suffix.mp4"
-                python3 "$VIDEO_DOWNLOADER_PY" "$query" "$output_file" 2>&1 | tee -a "$LOG_FILE"
+                python3 "$VIDEO_DOWNLOADER_PY" "$query" "$output_file" "$target_size_mb" 2>&1 | tee -a "$LOG_FILE"
                 ;;
             pixabay)
                 API_KEY_FILE="$HOME/.pixabay_api_key"
@@ -700,11 +717,11 @@ upload_file() {
                     echo "$api_key" > "$API_KEY_FILE"
                     echo -e "${GREEN}✅ Pixabay API key saved to $API_KEY_FILE. 💾${NC}"
                 fi
-                read -p "$(echo -e ${CYAN}🔍 Enter a search query for the video \(e.g., 'nature'\): ${NC})" query
+                read -p "$(echo -e ${CYAN}🔍 Enter a search query for the video (e.g., 'nature'): ${NC})" query
                 echo -e "${BLUE}📥 Downloading video from Pixabay... 🌟${NC}"
                 random_suffix=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
                 output_file="video_$random_suffix.mp4"
-                python3 "$PIXABAY_DOWNLOADER_PY" "$query" "$output_file" 2>&1 | tee -a "$LOG_FILE"
+                python3 "$PIXABAY_DOWNLOADER_PY" "$query" "$output_file" "$target_size_mb" 2>&1 | tee -a "$LOG_FILE"
                 if grep -q "API key invalid" "$LOG_FILE" 2>/dev/null; then
                     echo -e "${YELLOW}⚠️ Invalid Pixabay API key detected. Deleting $API_KEY_FILE...${NC}"
                     rm -f "$API_KEY_FILE" 2>/dev/null
@@ -719,7 +736,7 @@ upload_file() {
                     done
                     echo "$api_key" > "$API_KEY_FILE"
                     echo -e "${GREEN}✅ New Pixabay API key saved to $API_KEY_FILE. Retrying download... 🔄${NC}"
-                    python3 "$PIXABAY_DOWNLOADER_PY" "$query" "$output_file" 2>&1 | tee -a "$LOG_FILE"
+                    python3 "$PIXABAY_DOWNLOADER_PY" "$query" "$output_file" "$target_size_mb" 2>&1 | tee -a "$LOG_FILE"
                 fi
                 ;;
             pexels)
@@ -744,11 +761,11 @@ upload_file() {
                     echo "$api_key" > "$API_KEY_FILE"
                     echo -e "${GREEN}✅ Pexels API key saved to $API_KEY_FILE. 💾${NC}"
                 fi
-                read -p "$(echo -e ${CYAN}🔍 Enter a search query for the video \(e.g., 'nature'\): ${NC})" query
+                read -p "$(echo -e ${CYAN}🔍 Enter a search query for the video (e.g., 'nature'): ${NC})" query
                 echo -e "${BLUE}📥 Downloading video from Pexels... ✨${NC}"
                 random_suffix=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
                 output_file="video_$random_suffix.mp4"
-                python3 "$PEXELS_DOWNLOADER_PY" "$query" "$output_file" 2>&1 | tee -a "$LOG_FILE"
+                python3 "$PEXELS_DOWNLOADER_PY" "$query" "$output_file" "$target_size_mb" 2>&1 | tee -a "$LOG_FILE"
                 if grep -q "API key invalid" "$LOG_FILE" 2>/dev/null; then
                     echo -e "${YELLOW}⚠️ Invalid Pexels API key detected. Deleting $API_KEY_FILE...${NC}"
                     rm -f "$API_KEY_FILE" 2>/dev/null
@@ -763,7 +780,7 @@ upload_file() {
                     done
                     echo "$api_key" > "$API_KEY_FILE"
                     echo -e "${GREEN}✅ New Pexels API key saved to $API_KEY_FILE. Retrying download... 🔄${NC}"
-                    python3 "$PEXELS_DOWNLOADER_PY" "$query" "$output_file" 2>&1 | tee -a "$LOG_FILE"
+                    python3 "$PEXELS_DOWNLOADER_PY" "$query" "$output_file" "$target_size_mb" 2>&1 | tee -a "$LOG_FILE"
                 fi
                 ;;
             manual)
@@ -783,6 +800,7 @@ upload_file() {
                 if [[ $num =~ ^[0-9]+$ ]] && [ $num -ge 1 ] && [ $num -le ${#videos[@]} ]; then
                     selected="${videos[$((num-1))]}"
                     output_file="${selected##*/}"
+                    size_mb=$(du -m "$selected" | cut -f1)
                     echo -e "${GREEN}✅ Selected: $selected 🎉${NC}"
                 else
                     echo -e "${RED}❌ Invalid selection. 🤦${NC}"
@@ -796,6 +814,23 @@ upload_file() {
                 file_to_upload="$selected"
             else
                 file_to_upload="$output_file"
+                size_mb=$(du -m "$file_to_upload" | cut -f1)  # Get actual size after download
+            fi
+            balance_eth=$(get_balance_eth)
+            estimated_cost=$(awk "BEGIN {print ($size_mb / 100) * 0.0012}")
+            echo -e "${YELLOW}Estimated cost for ${size_mb} MB upload: ~${estimated_cost} ETH${NC}"
+            echo -e "${YELLOW}Your current balance: ${balance_eth} ETH${NC}"
+            if [ "$(echo "$balance_eth < $estimated_cost" | bc -l)" = "1" ]; then
+                echo -e "${RED}⚠️ Insufficient balance. You have approximately ${balance_eth} ETH, but need ~${estimated_cost} ETH.${NC}"
+                echo -ne "${CYAN}Do you want to continue anyway? (y/n): ${NC}"
+                read continue_confirm
+                if [[ ! "$continue_confirm" =~ ^[yY]$ ]]; then
+                    if [ "$source_type" != "manual" ]; then
+                        rm -f "$output_file" 2>/dev/null
+                    fi
+                    return_to_menu
+                    continue
+                fi
             fi
             echo -e "${BLUE}⬆️ Uploading video to Irys... 🚀${NC}"
             retries=0
@@ -926,4 +961,4 @@ main_menu() {
     done
 }
 
-main_menu
+main_menu 
