@@ -967,7 +967,8 @@ view_change_config() {
 
 
 return_to_menu() {
-    read -p "${CYAN}Press enter to return to menu... ⏎${NC}"
+    echo -e "${CYAN}Press enter to return to menu... ⏎${NC}"
+    read
 }
 
 # Main menu
