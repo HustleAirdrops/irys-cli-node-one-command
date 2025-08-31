@@ -858,7 +858,9 @@ view_change_config() {
     echo -e "👛  ${YELLOW}Wallet Addr: ${NC}$WALLET_ADDRESS"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 
-    read -p "$(echo -e ${CYAN}❓ Do you want to update the config? (y/n): ${NC})" confirm
+    echo -ne "${CYAN}❓ Do you want to update the config? (y/n): ${NC}"
+    read confirm
+
 
     if [[ "$confirm" =~ ^[yY]$ ]]; then
         echo -e "\n${BLUE}✏️  Updating Config...${NC}\n"
