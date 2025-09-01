@@ -1,4 +1,4 @@
-# 🚀 Irys CLI Manager: Your Ultimate Devnet Power Tool!
+# 🚀 Irys CLI Manager Guide
 
 *Empower your Irys interactions with ease – Install, Upload, Fund, and Manage like a pro! Built by Aashish for devs, creators, and airdrop enthusiasts. 💖*
 
