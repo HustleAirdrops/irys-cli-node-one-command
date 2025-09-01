@@ -39,7 +39,6 @@ The menu handles everything step-by-step. Here's a breakdown of each option:
 
 ### 1. 🛠️ Install IRYS CLI  
    - **One-Time Setup:** Auto-installs Irys CLI + dependencies (Node.js, ffmpeg, etc.).  
-   - **Config Magic:** Prompts for Private Key (0x optional), RPC URL, and Wallet Address – saved securely in `~/.irys_config.json`.  
    - **Faucet Time:** Claim free Sepolia ETH to get started:  
      - 🌐 [PK910 Sepolia Faucet](https://sepolia-faucet.pk910.de/)  
      - ☁️ [Google Cloud Sepolia Faucet](https://cloud.google.com/application/web3/faucet/ethereum/sepolia)  
@@ -47,24 +46,27 @@ The menu handles everything step-by-step. Here's a breakdown of each option:
    - *Why Sepolia?* It's Ethereum's testnet (Chain ID: 11155111). Grab RPC from [Chainlist.org](https://chainlist.org/chain/11155111).  
    - **Usage Tip:** Run once; CLI persists for future use. No "running node" – just command-line power!
 
-### 2. ⬆️ Upload Files – Effortless & Smart  
-   Submenu pops up: Videos or Images? Choose your adventure!  
-   - **📹 Video Uploads:**  
-     Sources include YouTube (yt-dlp search), Pixabay/Pexels (API-powered), or Manual (.mp4 from home/pipe folder).  
-     - Enter target size (MB) – Script downloads, concatenates, duplicates, or trims to match!  
-     - Cost Estimate: ~0.0012 ETH per 100 MB. Balance check built-in.  
-     - API Keys: Free from [Pixabay Docs](https://pixabay.com/api/docs/) or [Pexels API](https://www.pexels.com/api/) – Saved securely.  
-   - **📸 Image Uploads:**  
-     Picsum for random gems (customize size, grayscale, blur) or Manual (.jpg/.png/etc.).  
-   - **Post-Upload Perks:** Details saved in `~/irys_file_details.json` (ID, links). Auto-cleanup for non-manual files. Retries on fails!  
-   - *Eye-Candy:* Progress bars, emojis, and logs in `~/irys_script.log` for transparency.
+### 2. ⬆️ **Upload Files (Videos or Images)**
+- **How it works**: After running the CLI, a menu asks if you want to upload **videos** or **images**.
+- **Video Uploads** 📹:
+  1. **Choose Source**:
+     - **YouTube**: Search and download videos using yt-dlp.
+     - **Pixabay/Pexels**: Download videos via their APIs (get free API keys from [Pixabay Docs](https://pixabay.com/api/docs/) or [Pexels API](https://www.pexels.com/api/)).
+     - **Manual**: Use an `.mp4` file from your `home/pipe` folder.
+  2. **Set Size**: Enter the desired file size (in MB). The script will:
+     - Download, combine, duplicate, or trim the video to match your size.
+  3. **Cost**: Approx. 0.0012 ETH per 100 MB. The CLI checks your balance before uploading.
+- **Image Uploads** 📸:
+  1. **Choose Source**:
+     - **Picsum**: Get random images (customize size, grayscale, or blur).
+     - **Manual**: Use `.jpg`, `.png`, or other image files from your device.
 
 ### 3. 💸 Add Funds  
    - Prompt for ETH amount – Deposits instantly to your Irys devnet wallet via private key/RPC.  
    - *Tip:* Start small (0.001 ETH) for testing. Faucets keep it free!
 
 ### 4. 📊 Check Balance  
-   - Instant ETH readout on devnet. Perfect before big uploads!
+   - Shows how much ETH you have in your Irys devnet wallet...!
 
 ### 5. ⚙️ View/Change Config  
    - View masked Private Key, RPC, Wallet. Update any – No restarts needed!
