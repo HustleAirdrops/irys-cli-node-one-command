@@ -1,6 +1,5 @@
 # 🚀 Irys CLI Manager: Your Ultimate Devnet Power Tool!
 
-![Irys CLI Manager Banner](https://picsum.photos/seed/irys/1200/400?blur=2&grayscale)  
 *Empower your Irys interactions with ease – Install, Upload, Fund, and Manage like a pro! Built by Aashish for devs, creators, and airdrop enthusiasts. 💖*
 
 ---
@@ -15,26 +14,25 @@ bash <(curl -fsSL https://raw.githubusercontent.com/HustleAirdrops/irys-cli-node
 
 ---
 
-## 🎮 The Sleek Interactive Dashboard
+## 🏆 Interactive Menu
 
 Once launched, greet the vibrant menu:  
 ```
-┌─────────────────────────────────────────────────────────────────────────────────────────────┐
-│                  IRYS CLI MANAGER BY AASHISH – POWERED BY xAI 💖                           │
-└─────────────────────────────────────────────────────────────────────────────────────────────┘
-1. 🛠️ Install IRYS CLI – Set up in seconds!
-2. ⬆️ Upload Files – Videos, Images, Automated Magic!
-3. 💸 Add Funds – Fuel your wallet effortlessly.
-4. 📊 Check Balance – Stay on top of your ETH.
-5. ⚙️ View/Change Config – Tweak settings anytime.
-6. ❌ Exit – See you next time!
+======================= IRYS CLI MANAGER BY Aashish 💖 =======================
+1. 🛠️ Install IRYS CLI
+2. ⬆️ Upload File
+3. 💸 Add Fund
+4. 📊 Check Balance
+5. ⚙️ View/Change Config
+6. ❌ Exit
+==============================================================================
 ```
 
 Navigate with numbers – intuitive, fast, and fun! Submenus for uploads keep things organized and clutter-free.
 
 ---
 
-## 🔧 Core Features: What Makes It Shine
+## 🧭 What Can You Do With the Menu?
 
 This tool streamlines your Irys devnet workflow. Here's the breakdown, smooth and step-by-step:
 
