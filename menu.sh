@@ -812,9 +812,11 @@ install_node() {
         return 1
     fi
     ask_details
-    echo -e "${YELLOW}⚠️ Please claim faucet for devnet now. 💰${NC}"
-    read -p "${YELLOW}Press enter after claiming faucet...${NC}"
+    echo -e "${YELLOW}⚠️ Please claim faucet for Sepolia now. 💰${NC}"
+    echo -e "${YELLOW}Press enter after claiming faucet...${NC}"
+    read
     add_fund
+
 }
 
 # Add funds
@@ -857,7 +859,7 @@ upload_file() {
         show_header
         echo -e "${PURPLE}${BOLD}🌟======================= Upload File Submenu =======================🌟${NC}"
         echo -e "${YELLOW}1. 📹 Upload Video${NC}"
-        echo -e "${YELLOW}2. 📸 Upload Image${NC}"
+        echo -e "${YELLOW}2. 📸 Upload Image (recommended)${NC}"
         echo -e "${YELLOW}3. 🔙 Back to Main Menu${NC}"
         echo -e "${PURPLE}===================================================================${NC}"
         echo -ne "${CYAN}Select an option: ${NC}"
