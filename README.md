@@ -1,12 +1,13 @@
 # 🚀 Irys CLI Manager Guide
 
-*Empower your Irys interactions with ease – Install, Upload, Fund, and Manage like a pro! Built by Aashish for devs, creators, and airdrop enthusiasts. 💖*
+Welcome to the **Irys CLI Manager** by Aashish! This tool simplifies managing your Irys node on devnet, allowing you to install the CLI, upload videos/images from various sources, fund your wallet, check balances, and more—all through an intuitive menu. Perfect for developers, airdrop hunters, and content creators interacting with Irys effortlessly!
 
 ---
 
-## 🌟 Quick Start: Launch in One Command!
+## ⚡ One-Command Setup
 
-Dive right in with this simple terminal magic:  
+Get up and running in seconds! Run this command in your terminal:
+
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/HustleAirdrops/irys-cli-node-one-command/main/menu.sh)
 ```  
@@ -34,7 +35,7 @@ Navigate with numbers – intuitive, fast, and fun! Submenus for uploads keep th
 
 ## 🧭 What Can You Do With the Menu?
 
-This tool streamlines your Irys devnet workflow. Here's the breakdown, smooth and step-by-step:
+The menu handles everything step-by-step. Here's a breakdown of each option:
 
 ### 1. 🛠️ Install IRYS CLI  
    - **One-Time Setup:** Auto-installs Irys CLI + dependencies (Node.js, ffmpeg, etc.).  
@@ -107,4 +108,4 @@ Not here? Logs in `~/irys_script.log` or hit support!
 
 ---  
 
-Made with 💖 by Aashish – Redesigned for max vibe! 😎
+Made with 💖 by Aashish
