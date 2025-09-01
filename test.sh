@@ -787,7 +787,7 @@ upload_file() {
         echo -e "${PURPLE}${BOLD}🌟======================= Upload File Submenu =======================🌟${NC}"
         echo -e "${YELLOW}1. 📹 Upload Video${NC}"
         echo -e "${YELLOW}2. 📸 Upload Image${NC}"
-        echo -e "${YELLOW}3. 🔙 Back to Main Menu ⏪${NC}"
+        echo -e "${YELLOW}3. 🔙 Back to Main Menu${NC}"
         echo -e "${PURPLE}===================================================================${NC}"
         echo -ne "${CYAN}Select an option: ${NC}"
         read subchoice
@@ -803,11 +803,11 @@ upload_file() {
             show_header
             if [ "$upload_type" == "video" ]; then
                 echo -e "${PURPLE}${BOLD}🌟======================= Video Upload Sources =======================🌟${NC}"
-                echo -e "${YELLOW}1. 📹 From YouTube (yt-dlp) 🚀${NC}"
-                echo -e "${YELLOW}2. 🎥 From Pixabay 🌈${NC}"
-                echo -e "${YELLOW}3. 📽️ From Pexels ✨${NC}"
-                echo -e "${YELLOW}4. 🗂️ Manual Upload (from home or pipe folder) 📂${NC}"
-                echo -e "${YELLOW}5. 🔙 Back ⏪${NC}"
+                echo -e "${YELLOW}1. 📹 From YouTube (yt-dlp)${NC}"
+                echo -e "${YELLOW}2. 🎥 From Pixabay${NC}"
+                echo -e "${YELLOW}3. 📽️ From Pexels${NC}"
+                echo -e "${YELLOW}4. 🗂️ Manual Upload (from home or pipe folder)${NC}"
+                echo -e "${YELLOW}5. 🔙 Back${NC}"
                 echo -e "${PURPLE}===================================================================${NC}"
                 echo -ne "${CYAN}Select an option: ${NC}"
                 read videosub
@@ -821,8 +821,8 @@ upload_file() {
                 esac
             elif [ "$upload_type" == "image" ]; then
                 echo -e "${PURPLE}${BOLD}🌟======================= Image Upload Sources =======================🌟${NC}"
-                echo -e "${YELLOW}1. 📸 From Picsum (random placeholder images) 🖼️${NC}"
-                echo -e "${YELLOW}2. 🗂️ Manual Upload (from home or pipe folder) 📂${NC}"
+                echo -e "${YELLOW}1. 📸 From Picsum (random placeholder images)${NC}"
+                echo -e "${YELLOW}2. 🗂️ Manual Upload (from home or pipe folder)${NC}"
                 echo -e "${YELLOW}3. 🔙 Back ⏪${NC}"
                 echo -e "${PURPLE}===================================================================${NC}"
                 echo -ne "${CYAN}Select an option: ${NC}"
@@ -861,7 +861,8 @@ upload_file() {
         fi
         case $source_type in
             youtube)
-                read -p "${CYAN}🔍 Enter a search query for the video (e.g., 'random full hd'): ${NC}" query
+                echo -e "${CYAN}🔍 Enter a search query for the video (e.g., 'random full hd'): ${NC}"
+                read query
                 echo -e "${BLUE}📥 Downloading video from YouTube... 🎬${NC}"
                 random_suffix=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
                 output_file="video_$random_suffix.mp4"
@@ -879,7 +880,8 @@ upload_file() {
                 if [ ! -f "$API_KEY_FILE" ]; then
                     echo -e "${YELLOW}⚠️ Pixabay API key not found. Please provide a valid API key. 🔑${NC}"
                     while true; do
-                        read -p "${CYAN}Enter your Pixabay API key: ${NC}" api_key
+                        echo -e "${CYAN}Enter your Pixabay API key: ${NC}"
+                        read api_key
                         if [ -n "$api_key" ] && [ ${#api_key} -ge 10 ]; then
                             break
                         else
@@ -889,7 +891,8 @@ upload_file() {
                     echo "$api_key" > "$API_KEY_FILE"
                     echo -e "${GREEN}✅ Pixabay API key saved to $API_KEY_FILE. 💾${NC}"
                 fi
-                read -p "${CYAN}🔍 Enter a search query for the video (e.g., 'nature'): ${NC}" query
+                echo -e "${CYAN}🔍 Enter a search query for the video (e.g., 'nature'): ${NC}"
+                read query
                 echo -e "${BLUE}📥 Downloading video from Pixabay... 🌟${NC}"
                 random_suffix=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
                 output_file="video_$random_suffix.mp4"
@@ -907,7 +910,8 @@ upload_file() {
                 if [ ! -f "$API_KEY_FILE" ]; then
                     echo -e "${YELLOW}⚠️ Pexels API key not found. Please provide a valid API key. 🔑${NC}"
                     while true; do
-                        read -p "${CYAN}Enter your Pexels API key: ${NC}" api_key
+                        echo -e "${CYAN}Enter your Pexels API key: ${NC}"
+                        read api_key
                         if [ -n "$api_key" ] && [ ${#api_key} -ge 10 ]; then
                             break
                         else
@@ -917,29 +921,20 @@ upload_file() {
                     echo "$api_key" > "$API_KEY_FILE"
                     echo -e "${GREEN}✅ Pexels API key saved to $API_KEY_FILE. 💾${NC}"
                 fi
-                read -p "${CYAN}🔍 Enter a search query for the video (e.g., 'nature'): ${NC}" query
+                echo -e "${CYAN}🔍 Enter a search query for the video (e.g., 'nature'): ${NC}"
+                read query
                 echo -e "${BLUE}📥 Downloading video from Pexels... ✨${NC}"
                 random_suffix=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
                 output_file="video_$random_suffix.mp4"
                 python3 "$PEXELS_DOWNLOADER_PY" "$query" "$output_file" "$target_size_mb" 2>&1 | tee -a "$LOG_FILE"
                 ;;
-            picsum)
-                echo -ne "${CYAN}Enter width (default 1920): ${NC}"
-                read width
-                width=${width:-1920}
-                echo -ne "${CYAN}Enter height (default 1080): ${NC}"
-                read height
-                height=${height:-1080}
-                echo -ne "${CYAN}Grayscale? (y/n default n): ${NC}"
-                read gs
-                gs=${gs:-n}
-                if [[ $gs == y ]]; then grayscale="?grayscale"; else grayscale=""; fi
-                echo -ne "${CYAN}Blur (0-10 default 0): ${NC}"
-                read blur
-                blur=${blur:-0}
+            picsum)  
+                width=$((RANDOM % 1921 + 640))    
+                height=$((RANDOM % 1081 + 480))
+                if (( RANDOM % 2 )); then grayscale="?grayscale"; else grayscale=""; fi
+                blur=$((RANDOM % 11))
                 if [ $blur -gt 0 ]; then blur_param="&blur=$blur"; else blur_param=""; fi
-                echo -ne "${CYAN}Seed (optional): ${NC}"
-                read seed
+                seed=$((RANDOM % 10000))
                 if [ -n "$seed" ]; then seed_path="/seed/$seed"; else seed_path=""; fi
                 url="https://picsum.photos$seed_path/$width/$height$grayscale$blur_param"
                 random_suffix=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
