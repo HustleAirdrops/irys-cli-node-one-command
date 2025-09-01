@@ -1,5 +1,5 @@
 #!/bin/bash
-# Trap for smooth exit on Ctrl+C  AAAAAAAAA
+# Trap for smooth exit on Ctrl+C
 trap 'echo -e "${RED}Exiting gracefully...${NC}"; exit 0' INT
 
 # Color definitions
@@ -101,6 +101,28 @@ def concatenate_with_moviepy(files, output_file):
         print(f"⚠️ Moviepy concatenation failed: {str(e)}")
         return False
 
+def trim_video_to_size(input_file, target_bytes):
+    try:
+        duration_str = subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', input_file]).decode().strip()
+        duration = float(duration_str)
+        final_size = os.path.getsize(input_file)
+        new_duration = duration * (target_bytes / final_size)
+        temp_file = "trimmed_" + input_file
+        result = subprocess.run(['ffmpeg', '-i', input_file, '-t', str(new_duration), '-c', 'copy', temp_file], capture_output=True, text=True)
+        if result.returncode == 0 and os.path.exists(temp_file) and os.path.getsize(temp_file) > 0:
+            os.remove(input_file)
+            os.rename(temp_file, input_file)
+            print(f"✅ Trimmed video to approximate {format_size(os.path.getsize(input_file))}")
+            return True
+        else:
+            print(f"⚠️ Trim failed: {result.stderr}")
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+            return False
+    except Exception as e:
+        print(f"⚠️ Failed to trim: {str(e)}")
+        return False
+
 def download_videos(query, output_file, target_size_mb=1000, max_filesize=1100*1024*1024, min_filesize=50*1024*1024):
     ydl_opts = {
         'format': 'best',
@@ -125,7 +147,8 @@ def download_videos(query, output_file, target_size_mb=1000, max_filesize=1100*1
             if not candidates:
                 print("⚠️ No suitable videos found (at least 50MB and up to ~1GB).")
                 return
-            for size, v in sorted(candidates, key=lambda x: -x[0]):
+            candidates.sort(key=lambda x: -x[0])  # largest first
+            for size, v in candidates:
                 if total_size + size <= target_size_mb * 1024 * 1024:
                     total_size += size
                     current_file = len(downloaded_files) + 1
@@ -147,8 +170,20 @@ def download_videos(query, output_file, target_size_mb=1000, max_filesize=1100*1
         if not downloaded_files:
             print("⚠️ No videos found close to 1GB.")
             return
+        target_bytes = target_size_mb * 1024 * 1024
+        original_files = downloaded_files.copy()
+        original_size = total_size
+        while total_size < target_bytes * 0.95 and original_size > 0:
+            new_files = []
+            for fn in original_files:
+                new_fn = "dup_" + ''.join(random.choices(string.ascii_letters + string.digits, k=8)) + "_" + os.path.basename(fn)
+                shutil.copy(fn, new_fn)
+                new_files.append(new_fn)
+            downloaded_files += new_files
+            total_size += original_size
         if len(downloaded_files) == 1:
             os.rename(downloaded_files[0], output_file)
+            downloaded_files = []
         else:
             success = False
             if check_ffmpeg():
@@ -170,10 +205,13 @@ def download_videos(query, output_file, target_size_mb=1000, max_filesize=1100*1
                 print("⚠️ Concatenation failed. Using first video only.")
                 os.rename(downloaded_files[0], output_file)
                 downloaded_files = downloaded_files[1:]
-            for fn in downloaded_files:
-                if os.path.exists(fn):
-                    os.remove(fn)
+        for fn in downloaded_files:
+            if os.path.exists(fn):
+                os.remove(fn)
         if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
+            final_size = os.path.getsize(output_file)
+            if final_size > target_bytes:
+                trim_video_to_size(output_file, target_bytes)
             print(f"✅ Video ready: {output_file} ({format_size(os.path.getsize(output_file))})")
         else:
             print("⚠️ Failed to create final video file.")
@@ -265,6 +303,28 @@ def concatenate_with_moviepy(files, output_file):
         print(f"⚠️ Moviepy concatenation failed: {str(e)}")
         return False
 
+def trim_video_to_size(input_file, target_bytes):
+    try:
+        duration_str = subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', input_file]).decode().strip()
+        duration = float(duration_str)
+        final_size = os.path.getsize(input_file)
+        new_duration = duration * (target_bytes / final_size)
+        temp_file = "trimmed_" + input_file
+        result = subprocess.run(['ffmpeg', '-i', input_file, '-t', str(new_duration), '-c', 'copy', temp_file], capture_output=True, text=True)
+        if result.returncode == 0 and os.path.exists(temp_file) and os.path.getsize(temp_file) > 0:
+            os.remove(input_file)
+            os.rename(temp_file, input_file)
+            print(f"✅ Trimmed video to approximate {format_size(os.path.getsize(input_file))}")
+            return True
+        else:
+            print(f"⚠️ Trim failed: {result.stderr}")
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+            return False
+    except Exception as e:
+        print(f"⚠️ Failed to trim: {str(e)}")
+        return False
+
 def download_videos(query, output_file, target_size_mb=1000):
     api_key_file = os.path.expanduser('~/.pixabay_api_key')
     if not os.path.exists(api_key_file):
@@ -284,29 +344,35 @@ def download_videos(query, output_file, target_size_mb=1000):
         if not videos:
             print("⚠️ No videos found for query.")
             return
-        videos.sort(key=lambda x: x['duration'], reverse=True)
+        candidates = []
+        for v in videos:
+            video_url = v['videos'].get('large', {}).get('url') or v['videos'].get('medium', {}).get('url')
+            if not video_url:
+                continue
+            head_resp = requests.head(video_url, timeout=10)
+            size = int(head_resp.headers.get('content-length', 0))
+            if size >= 50 * 1024 * 1024:
+                candidates.append((size, v, video_url))
+        if not candidates:
+            print("⚠️ No suitable videos found (at least 50MB).")
+            return
+        candidates.sort(key=lambda x: -x[0])  # largest first
         downloaded_files = []
         total_size = 0
         total_downloaded = 0
         overall_start_time = time.time()
         min_filesize = 50 * 1024 * 1024
         target_bytes = target_size_mb * 1024 * 1024
-        for i, v in enumerate(videos):
-            video_url = v['videos'].get('large', {}).get('url') or v['videos'].get('medium', {}).get('url')
-            if not video_url:
-                continue
-            filename = f"pix_{i}_{''.join(random.choices(string.ascii_letters + string.digits, k=8))}.mp4"
-            print(f"🎬 Downloading video {i+1}: {v['tags']} ({v['duration']}s)")
-            file_start_time = time.time()
-            resp = requests.get(video_url, stream=True, timeout=10)
-            size = int(resp.headers.get('content-length', 0))
+        for size, v, video_url in candidates:
             remaining = target_bytes - total_size
             if size < min_filesize:
-                print(f"Skipping small video: {format_size(size)} < 50 MB")
                 continue
             if size > remaining:
-                print(f"Skipping large video: {format_size(size)} > remaining {format_size(remaining)}")
                 continue
+            filename = f"pix_{v['id']}_{''.join(random.choices(string.ascii_letters + string.digits, k=8))}.mp4"
+            print(f"🎬 Downloading video: {v['tags']} ({format_size(size)})")
+            file_start_time = time.time()
+            resp = requests.get(video_url, stream=True, timeout=10)
             with open(filename, 'wb') as f:
                 downloaded = 0
                 for chunk in resp.iter_content(chunk_size=8192):
@@ -329,13 +395,22 @@ def download_videos(query, output_file, target_size_mb=1000):
             total_size += file_size
             total_downloaded += file_size
             downloaded_files.append(filename)
-            if total_size >= target_bytes:
-                break
         if not downloaded_files:
             print("⚠️ No suitable videos downloaded.")
             return
+        original_files = downloaded_files.copy()
+        original_size = total_size
+        while total_size < target_bytes * 0.95 and original_size > 0:
+            new_files = []
+            for fn in original_files:
+                new_fn = "dup_" + ''.join(random.choices(string.ascii_letters + string.digits, k=8)) + "_" + os.path.basename(fn)
+                shutil.copy(fn, new_fn)
+                new_files.append(new_fn)
+            downloaded_files += new_files
+            total_size += original_size
         if len(downloaded_files) == 1:
             os.rename(downloaded_files[0], output_file)
+            downloaded_files = []
         else:
             success = False
             if check_ffmpeg():
@@ -357,10 +432,13 @@ def download_videos(query, output_file, target_size_mb=1000):
                 print("⚠️ Concatenation failed. Using first video only.")
                 os.rename(downloaded_files[0], output_file)
                 downloaded_files = downloaded_files[1:]
-            for fn in downloaded_files:
-                if os.path.exists(fn):
-                    os.remove(fn)
+        for fn in downloaded_files:
+            if os.path.exists(fn):
+                os.remove(fn)
         if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
+            final_size = os.path.getsize(output_file)
+            if final_size > target_bytes:
+                trim_video_to_size(output_file, target_bytes)
             print(f"✅ Video ready: {output_file} ({format_size(os.path.getsize(output_file))})")
         else:
             print("⚠️ Failed to create final video file.")
@@ -440,6 +518,28 @@ def concatenate_with_moviepy(files, output_file):
         print(f"⚠️ Moviepy concatenation failed: {str(e)}")
         return False
 
+def trim_video_to_size(input_file, target_bytes):
+    try:
+        duration_str = subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', input_file]).decode().strip()
+        duration = float(duration_str)
+        final_size = os.path.getsize(input_file)
+        new_duration = duration * (target_bytes / final_size)
+        temp_file = "trimmed_" + input_file
+        result = subprocess.run(['ffmpeg', '-i', input_file, '-t', str(new_duration), '-c', 'copy', temp_file], capture_output=True, text=True)
+        if result.returncode == 0 and os.path.exists(temp_file) and os.path.getsize(temp_file) > 0:
+            os.remove(input_file)
+            os.rename(temp_file, input_file)
+            print(f"✅ Trimmed video to approximate {format_size(os.path.getsize(input_file))}")
+            return True
+        else:
+            print(f"⚠️ Trim failed: {result.stderr}")
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+            return False
+    except Exception as e:
+        print(f"⚠️ Failed to trim: {str(e)}")
+        return False
+
 def download_videos(query, output_file, target_size_mb=1000):
     api_key_file = os.path.expanduser('~/.pexels_api_key')
     if not os.path.exists(api_key_file):
@@ -460,14 +560,8 @@ def download_videos(query, output_file, target_size_mb=1000):
         if not videos:
             print("⚠️ No videos found for query.")
             return
-        videos.sort(key=lambda x: x['duration'], reverse=True)
-        downloaded_files = []
-        total_size = 0
-        total_downloaded = 0
-        overall_start_time = time.time()
-        min_filesize = 50 * 1024 * 1024
-        target_bytes = target_size_mb * 1024 * 1024
-        for i, v in enumerate(videos):
+        candidates = []
+        for v in videos:
             video_files = v.get('video_files', [])
             video_url = None
             for file in video_files:
@@ -476,18 +570,30 @@ def download_videos(query, output_file, target_size_mb=1000):
                     break
             if not video_url:
                 continue
-            filename = f"pex_{i}_{''.join(random.choices(string.ascii_letters + string.digits, k=8))}.mp4"
-            print(f"🎬 Downloading video {i+1}: {v['id']} ({v['duration']}s)")
-            file_start_time = time.time()
-            resp = requests.get(video_url, stream=True, timeout=10)
-            size = int(resp.headers.get('content-length', 0))
+            head_resp = requests.head(video_url, timeout=10)
+            size = int(head_resp.headers.get('content-length', 0))
+            if size >= 50 * 1024 * 1024:
+                candidates.append((size, v, video_url))
+        if not candidates:
+            print("⚠️ No suitable videos found (at least 50MB).")
+            return
+        candidates.sort(key=lambda x: -x[0])  # largest first
+        downloaded_files = []
+        total_size = 0
+        total_downloaded = 0
+        overall_start_time = time.time()
+        min_filesize = 50 * 1024 * 1024
+        target_bytes = target_size_mb * 1024 * 1024
+        for size, v, video_url in candidates:
             remaining = target_bytes - total_size
             if size < min_filesize:
-                print(f"Skipping small video: {format_size(size)} < 50 MB")
                 continue
             if size > remaining:
-                print(f"Skipping large video: {format_size(size)} > remaining {format_size(remaining)}")
                 continue
+            filename = f"pex_{v['id']}_{''.join(random.choices(string.ascii_letters + string.digits, k=8))}.mp4"
+            print(f"🎬 Downloading video: {v['id']} ({format_size(size)})")
+            file_start_time = time.time()
+            resp = requests.get(video_url, stream=True, timeout=10)
             with open(filename, 'wb') as f:
                 downloaded = 0
                 for chunk in resp.iter_content(chunk_size=8192):
@@ -510,13 +616,22 @@ def download_videos(query, output_file, target_size_mb=1000):
             total_size += file_size
             total_downloaded += file_size
             downloaded_files.append(filename)
-            if total_size >= target_bytes:
-                break
         if not downloaded_files:
             print("⚠️ No suitable videos downloaded.")
             return
+        original_files = downloaded_files.copy()
+        original_size = total_size
+        while total_size < target_bytes * 0.95 and original_size > 0:
+            new_files = []
+            for fn in original_files:
+                new_fn = "dup_" + ''.join(random.choices(string.ascii_letters + string.digits, k=8)) + "_" + os.path.basename(fn)
+                shutil.copy(fn, new_fn)
+                new_files.append(new_fn)
+            downloaded_files += new_files
+            total_size += original_size
         if len(downloaded_files) == 1:
             os.rename(downloaded_files[0], output_file)
+            downloaded_files = []
         else:
             success = False
             if check_ffmpeg():
@@ -538,10 +653,13 @@ def download_videos(query, output_file, target_size_mb=1000):
                 print("⚠️ Concatenation failed. Using first video only.")
                 os.rename(downloaded_files[0], output_file)
                 downloaded_files = downloaded_files[1:]
-            for fn in downloaded_files:
-                if os.path.exists(fn):
-                    os.remove(fn)
+        for fn in downloaded_files:
+            if os.path.exists(fn):
+                os.remove(fn)
         if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
+            final_size = os.path.getsize(output_file)
+            if final_size > target_bytes:
+                trim_video_to_size(output_file, target_bytes)
             print(f"✅ Video ready: {output_file} ({format_size(os.path.getsize(output_file))})")
         else:
             print("⚠️ Failed to create final video file.")
@@ -638,7 +756,6 @@ add_fund() {
     irys fund "$amount" -n devnet -t ethereum -w "$PRIVATE_KEY" --provider-url "$RPC_URL" 2>&1 | tee -a "$LOG_FILE"
 }
 
-
 # Check balance
 check_balance() {
     ask_details
@@ -655,10 +772,6 @@ get_balance_eth() {
 upload_file() {
     ask_details
     source "$VENV_DIR/bin/activate"
-    available_sources=("youtube" "pixabay" "pexels" "picsum" "manual")
-    if [ ${#available_sources[@]} -eq 1 ]; then
-        echo -e "${YELLOW}⚠️ No download sources available (yt-dlp or requests not installed). Only manual upload is available. 📁${NC}"
-    fi
     if ! command -v ffmpeg >/dev/null 2>&1; then
         echo -e "${YELLOW}⚠️ ffmpeg is not installed. Attempting to install... 🔧${NC}"
         sudo apt update && sudo apt install -y ffmpeg 2>&1 | tee -a "$LOG_FILE"
@@ -672,43 +785,77 @@ upload_file() {
         clear
         show_header
         echo -e "${PURPLE}${BOLD}🌟======================= Upload File Submenu =======================🌟${NC}"
-        for i in "${!available_sources[@]}"; do
-            case ${available_sources[$i]} in
-                "youtube") echo -e "${YELLOW}$((i+1)). 📹 Upload from YouTube (yt-dlp) 🚀${NC}" ;;
-                "pixabay") echo -e "${YELLOW}$((i+1)). 🎥 Upload from Pixabay 🌈${NC}" ;;
-                "pexels") echo -e "${YELLOW}$((i+1)). 📽️ Upload from Pexels ✨${NC}" ;;
-                "picsum") echo -e "${YELLOW}$((i+1)). 📸 Upload from Picsum (random placeholder images) 🖼️${NC}" ;;
-                "manual") echo -e "${YELLOW}$((i+1)). 🗂️ Manual Upload (from home or pipe folder) 📂${NC}" ;;
-            esac
-        done
-        echo -e "${YELLOW}$(( ${#available_sources[@]} + 1 )). 🔙 Back to Main Menu ⏪${NC}"
+        echo -e "${YELLOW}1. 📹 Upload Video${NC}"
+        echo -e "${YELLOW}2. 📸 Upload Image${NC}"
+        echo -e "${YELLOW}3. 🔙 Back to Main Menu ⏪${NC}"
         echo -e "${PURPLE}===================================================================${NC}"
-        echo -e ${CYAN}Select an option: ${NC}
-read subchoice
-        if [ "$subchoice" -eq $(( ${#available_sources[@]} + 1 )) ] 2>/dev/null; then
-            deactivate
-            return
-        fi
-        if [[ ! "$subchoice" =~ ^[0-9]+$ ]] || [ "$subchoice" -lt 1 ] || [ "$subchoice" -gt ${#available_sources[@]} ]; then
-            echo -e "${RED}❌ Invalid option. Try again. 🤦${NC}"
-            sleep 1
-            continue
-        fi
-        source_type=${available_sources[$((subchoice-1))]}
+        echo -ne "${CYAN}Select an option: ${NC}"
+        read subchoice
+        case $subchoice in
+            3) deactivate; return ;;
+            1) upload_type="video" ;;
+            2) upload_type="image" ;;
+            *) echo -e "${RED}❌ Invalid option. Try again. 🤦${NC}"; sleep 1; continue ;;
+        esac
+        source_type=""
+        while [ -z "$source_type" ]; do
+            clear
+            show_header
+            if [ "$upload_type" == "video" ]; then
+                echo -e "${PURPLE}${BOLD}🌟======================= Video Upload Sources =======================🌟${NC}"
+                echo -e "${YELLOW}1. 📹 From YouTube (yt-dlp) 🚀${NC}"
+                echo -e "${YELLOW}2. 🎥 From Pixabay 🌈${NC}"
+                echo -e "${YELLOW}3. 📽️ From Pexels ✨${NC}"
+                echo -e "${YELLOW}4. 🗂️ Manual Upload (from home or pipe folder) 📂${NC}"
+                echo -e "${YELLOW}5. 🔙 Back ⏪${NC}"
+                echo -e "${PURPLE}===================================================================${NC}"
+                echo -ne "${CYAN}Select an option: ${NC}"
+                read videosub
+                case $videosub in
+                    1) source_type="youtube" ;;
+                    2) source_type="pixabay" ;;
+                    3) source_type="pexels" ;;
+                    4) source_type="manual" ;;
+                    5) break ;;
+                    *) echo -e "${RED}❌ Invalid option. Try again. 🤦${NC}"; sleep 1; continue ;;
+                esac
+            elif [ "$upload_type" == "image" ]; then
+                echo -e "${PURPLE}${BOLD}🌟======================= Image Upload Sources =======================🌟${NC}"
+                echo -e "${YELLOW}1. 📸 From Picsum (random placeholder images) 🖼️${NC}"
+                echo -e "${YELLOW}2. 🗂️ Manual Upload (from home or pipe folder) 📂${NC}"
+                echo -e "${YELLOW}3. 🔙 Back ⏪${NC}"
+                echo -e "${PURPLE}===================================================================${NC}"
+                echo -ne "${CYAN}Select an option: ${NC}"
+                read imagesub
+                case $imagesub in
+                    1) source_type="picsum" ;;
+                    2) source_type="manual" ;;
+                    3) break ;;
+                    *) echo -e "${RED}❌ Invalid option. Try again. 🤦${NC}"; sleep 1; continue ;;
+                esac
+            fi
+        done
+        if [ -z "$source_type" ]; then continue; fi
         balance_eth=$(get_balance_eth)
-        if [ "$source_type" != "manual" ] && [ "$source_type" != "picsum" ]; then
+        target_size_mb=""
+        if [ "$upload_type" == "video" ] || [ "$source_type" == "manual" ]; then
             max_mb=$(awk "BEGIN {print int(($balance_eth / 0.0012) * 100)}")
             echo -e "${YELLOW}Based on your balance (${balance_eth} ETH), you can upload approximately ${max_mb} MB.${NC}"
-            read -p "${CYAN}Enter target video size in MB: ${NC}" target_size_mb
-            estimated_cost=$(awk "BEGIN {print ($target_size_mb / 100) * 0.0012}")
-            echo -e "${YELLOW}Estimated cost for ${target_size_mb} MB upload: ~${estimated_cost} ETH${NC}"
-            echo -e "${YELLOW}Your current balance: ${balance_eth} ETH${NC}"
-            if [ "$(awk "BEGIN {if ($balance_eth < $estimated_cost) print 1; else print 0}")" = "1" ]; then
-                echo -e "${RED}⚠️ Insufficient balance. You have approximately ${balance_eth} ETH, but need ~${estimated_cost} ETH.${NC}"
-                read -p "${CYAN}Do you want to continue anyway? (y/n): ${NC}" continue_confirm
-                if [[ ! "$continue_confirm" =~ ^[yY]$ ]]; then
-                    return_to_menu
-                    continue
+            if [ "$source_type" != "manual" ]; then
+                echo -ne "${CYAN}Enter target file size in MB: ${NC}"
+                read target_size_mb
+            fi
+            if [ -n "$target_size_mb" ]; then
+                estimated_cost=$(awk "BEGIN {print ($target_size_mb / 100) * 0.0012}")
+                echo -e "${YELLOW}Estimated cost for ${target_size_mb} MB upload: ~${estimated_cost} ETH${NC}"
+                echo -e "${YELLOW}Your current balance: ${balance_eth} ETH${NC}"
+                if [ "$(awk "BEGIN {if ($balance_eth < $estimated_cost) print 1; else print 0}")" = "1" ]; then
+                    echo -e "${RED}⚠️ Insufficient balance. You have approximately ${balance_eth} ETH, but need ~${estimated_cost} ETH.${NC}"
+                    read -p "${CYAN}Do you want to continue anyway? (y/n): ${NC}" continue_confirm
+                    if [[ ! "$continue_confirm" =~ ^[yY]$ ]]; then
+                        return_to_menu
+                        continue
+                    fi
                 fi
             fi
         fi
@@ -719,7 +866,6 @@ read subchoice
                 random_suffix=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
                 output_file="video_$random_suffix.mp4"
                 python3 "$VIDEO_DOWNLOADER_PY" "$query" "$output_file" "$target_size_mb" 2>&1 | tee -a "$LOG_FILE"
-                size_mb=$(du -m "$output_file" | cut -f1 2>/dev/null || echo 0)
                 ;;
             pixabay)
                 API_KEY_FILE="$HOME/.pixabay_api_key"
@@ -748,23 +894,6 @@ read subchoice
                 random_suffix=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
                 output_file="video_$random_suffix.mp4"
                 python3 "$PIXABAY_DOWNLOADER_PY" "$query" "$output_file" "$target_size_mb" 2>&1 | tee -a "$LOG_FILE"
-                size_mb=$(du -m "$output_file" | cut -f1 2>/dev/null || echo 0)
-                if grep -q "API key invalid" "$LOG_FILE" 2>/dev/null; then
-                    echo -e "${YELLOW}⚠️ Invalid Pixabay API key detected. Deleting $API_KEY_FILE...${NC}"
-                    rm -f "$API_KEY_FILE" 2>/dev/null
-                    echo -e "${YELLOW}⚠️ Please provide a valid API key. 🔑${NC}"
-                    while true; do
-                        read -p "${CYAN}Enter your Pixabay API key: ${NC}" api_key
-                        if [ -n "$api_key" ] && [ ${#api_key} -ge 10 ]; then
-                            break
-                        else
-                            echo -e "${RED}❌ Invalid API key (empty or too short). Please try again.${NC}"
-                        fi
-                    done
-                    echo "$api_key" > "$API_KEY_FILE"
-                    echo -e "${GREEN}✅ New Pixabay API key saved to $API_KEY_FILE. Retrying download... 🔄${NC}"
-                    python3 "$PIXABAY_DOWNLOADER_PY" "$query" "$output_file" "$target_size_mb" 2>&1 | tee -a "$LOG_FILE"
-                fi
                 ;;
             pexels)
                 API_KEY_FILE="$HOME/.pexels_api_key"
@@ -793,85 +922,82 @@ read subchoice
                 random_suffix=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
                 output_file="video_$random_suffix.mp4"
                 python3 "$PEXELS_DOWNLOADER_PY" "$query" "$output_file" "$target_size_mb" 2>&1 | tee -a "$LOG_FILE"
-                size_mb=$(du -m "$output_file" | cut -f1 2>/dev/null || echo 0)
-                if grep -q "API key invalid" "$LOG_FILE" 2>/dev/null; then
-                    echo -e "${YELLOW}⚠️ Invalid Pexels API key detected. Deleting $API_KEY_FILE...${NC}"
-                    rm -f "$API_KEY_FILE" 2>/dev/null
-                    echo -e "${YELLOW}⚠️ Please provide a valid API key. 🔑${NC}"
-                    while true; do
-                        read -p "${CYAN}Enter your Pexels API key: ${NC}" api_key
-                        if [ -n "$api_key" ] && [ ${#api_key} -ge 10 ]; then
-                            break
-                        else
-                            echo -e "${RED}❌ Invalid API key (empty or too short). Please try again.${NC}"
-                        fi
-                    done
-                    echo "$api_key" > "$API_KEY_FILE"
-                    echo -e "${GREEN}✅ New Pexels API key saved to $API_KEY_FILE. Retrying download... 🔄${NC}"
-                    python3 "$PEXELS_DOWNLOADER_PY" "$query" "$output_file" "$target_size_mb" 2>&1 | tee -a "$LOG_FILE"
-                fi
                 ;;
             picsum)
-                width=${width:-1920}              
-                height=${height:-1080}      
+                echo -ne "${CYAN}Enter width (default 1920): ${NC}"
+                read width
+                width=${width:-1920}
+                echo -ne "${CYAN}Enter height (default 1080): ${NC}"
+                read height
+                height=${height:-1080}
+                echo -ne "${CYAN}Grayscale? (y/n default n): ${NC}"
+                read gs
                 gs=${gs:-n}
+                if [[ $gs == y ]]; then grayscale="?grayscale"; else grayscale=""; fi
+                echo -ne "${CYAN}Blur (0-10 default 0): ${NC}"
+                read blur
                 blur=${blur:-0}
+                if [ $blur -gt 0 ]; then blur_param="&blur=$blur"; else blur_param=""; fi
+                echo -ne "${CYAN}Seed (optional): ${NC}"
+                read seed
                 if [ -n "$seed" ]; then seed_path="/seed/$seed"; else seed_path=""; fi
-                url="https://picsum.photos$seed_path/$width/$height$grayscale$blur_param.jpg"
+                url="https://picsum.photos$seed_path/$width/$height$grayscale$blur_param"
                 random_suffix=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
                 output_file="picsum_$random_suffix.jpg"
                 echo -e "${BLUE}📥 Downloading image from Picsum: $url ... 🖼️${NC}"
                 curl -L -o "$output_file" "$url" 2>&1 | tee -a "$LOG_FILE"
-                size_mb=$(du -m "$output_file" | cut -f1 2>/dev/null || echo 0)
-                estimated_cost=$(awk "BEGIN {print ($size_mb / 100) * 0.0012}")
-                echo -e "${YELLOW}Downloaded ${size_mb} MB, estimated cost ~${estimated_cost} ETH${NC}"
-                echo -e "${YELLOW}Your current balance: ${balance_eth} ETH${NC}"
                 ;;
             manual)
-                echo -e "${BLUE}🔍 Searching for .mp4 files in $HOME and $HOME/pipe... 🔎${NC}"
-                videos=($(find "$HOME" "$HOME/pipe" -type f -name "*.mp4" 2>/dev/null))
-                if [ ${#videos[@]} -eq 0 ]; then
-                    echo -e "${RED}❌ No .mp4 files found. 😔${NC}"
+                if [ "$upload_type" == "video" ]; then
+                    echo -e "${BLUE}🔍 Searching for .mp4 files in $HOME and $HOME/pipe... 🔎${NC}"
+                    files=($(find "$HOME" "$HOME/pipe" -type f -name "*.mp4" 2>/dev/null))
+                else
+                    echo -e "${BLUE}🔍 Searching for image files (.jpg, .png, .gif, .jpeg) in $HOME and $HOME/pipe... 🔎${NC}"
+                    files=($(find "$HOME" "$HOME/pipe" -type f \( -name "*.jpg" -o -name "*.png" -o -name "*.gif" -o -name "*.jpeg" \) 2>/dev/null))
+                fi
+                if [ ${#files[@]} -eq 0 ]; then
+                    echo -e "${RED}❌ No suitable files found. 😔${NC}"
                     return_to_menu
                     continue
                 fi
-                echo -e "${YELLOW}Available videos: 🎥${NC}"
-                for i in "${!videos[@]}"; do
-                    size=$(du -h "${videos[i]}" | cut -f1)
-                    echo "$((i+1)). ${videos[i]} ($size)"
+                echo -e "${YELLOW}Available files:${NC}"
+                for i in "${!files[@]}"; do
+                    size=$(du -h "${files[i]}" | cut -f1)
+                    echo "$((i+1)). ${files[i]} ($size)"
                 done
-                read -p "${CYAN}Select a number: ${NC}" num
-                if [[ $num =~ ^[0-9]+$ ]] && [ $num -ge 1 ] && [ $num -le ${#videos[@]} ]; then
-                    selected="${videos[$((num-1))]}"
+                echo -ne "${CYAN}Select a number: ${NC}"
+                read num
+                if [[ $num =~ ^[0-9]+$ ]] && [ $num -ge 1 ] && [ $num -le ${#files[@]} ]; then
+                    selected="${files[$((num-1))]}"
                     output_file="${selected##*/}"
                     size_mb=$(du -m "$selected" | cut -f1)
                     echo -e "${GREEN}✅ Selected: $selected 🎉${NC}"
+                    estimated_cost=$(awk "BEGIN {print ($size_mb / 100) * 0.0012}")
+                    echo -e "${YELLOW}Estimated cost for ${size_mb} MB upload: ~${estimated_cost} ETH${NC}"
+                    echo -e "${YELLOW}Your current balance: ${balance_eth} ETH${NC}"
+                    if [ "$(awk "BEGIN {if ($balance_eth < $estimated_cost) print 1; else print 0}")" = "1" ]; then
+                        echo -e "${RED}⚠️ Insufficient balance. You have approximately ${balance_eth} ETH, but need ~${estimated_cost} ETH.${NC}"
+                        read -p "${CYAN}Do you want to continue anyway? (y/n): ${NC}" continue_confirm
+                        if [[ ! "$continue_confirm" =~ ^[yY]$ ]]; then
+                            return_to_menu
+                            continue
+                        fi
+                    fi
                 else
                     echo -e "${RED}❌ Invalid selection. 🤦${NC}"
                     return_to_menu
                     continue
                 fi
-                estimated_cost=$(awk "BEGIN {print ($size_mb / 100) * 0.0012}")
-                echo -e "${YELLOW}Estimated cost for ${size_mb} MB upload: ~${estimated_cost} ETH${NC}"
-                echo -e "${YELLOW}Your current balance: ${balance_eth} ETH${NC}"
-                if [ "$(awk "BEGIN {if ($balance_eth < $estimated_cost) print 1; else print 0}")" = "1" ]; then
-                    echo -e "${RED}⚠️ Insufficient balance. You have approximately ${balance_eth} ETH, but need ~${estimated_cost} ETH.${NC}"
-                    read -p "${CYAN}Do you want to continue anyway? (y/n): ${NC}" continue_confirm
-
-                    if [[ ! "$continue_confirm" =~ ^[yY]$ ]]; then
-                        return_to_menu
-                        continue
-                    fi
-                fi
                 ;;
         esac
+        size_mb=$(du -m "$output_file" | cut -f1 2>/dev/null || echo 0)
         if [ -f "$output_file" ] || [ "$source_type" = "manual" ]; then
             if [ "$source_type" = "manual" ]; then
                 file_to_upload="$selected"
             else
                 file_to_upload="$output_file"
             fi
-            echo -e "${BLUE}⬆️ Uploading video to Irys... 🚀${NC}"
+            echo -e "${BLUE}⬆️ Uploading file to Irys... 🚀${NC}"
             retries=0
             max_retries=3
             while [ $retries -lt $max_retries ]; do
@@ -896,7 +1022,7 @@ read subchoice
                             echo -e "${YELLOW}⚠️ Failed to save file details to $DETAILS_FILE 😞${NC}"
                         fi
                         if [ "$source_type" != "manual" ]; then
-                            echo -e "${BLUE}🗑️ Deleting local video file... 🧹${NC}"
+                            echo -e "${BLUE}🗑️ Deleting local file... 🧹${NC}"
                             rm -f "$output_file"
                         fi
                         break
@@ -916,12 +1042,13 @@ read subchoice
                 fi
             fi
         else
-            echo -e "${YELLOW}⚠️ No video file found. Download may have failed or been canceled. 😞${NC}"
+            echo -e "${YELLOW}⚠️ No file found. Download may have failed or been canceled. 😞${NC}"
         fi
         return_to_menu
     done
     deactivate
 }
+
 view_change_config() {
     load_config
     masked_pk="${PRIVATE_KEY:0:6}...${PRIVATE_KEY: -4}"
@@ -965,8 +1092,6 @@ view_change_config() {
     fi
 }
 
-
-
 return_to_menu() {
     echo -e "${CYAN}Press enter to return to menu... ⏎${NC}"
     read
@@ -987,8 +1112,8 @@ main_menu() {
         echo -e "${YELLOW}5. ⚙️ View/Change Config${NC}"
         echo -e "${YELLOW}6. ❌ Exit${NC}"
         echo -e "${BLUE}=============================================================================${NC}"
-        echo -e ${CYAN}Select an option: ${NC}
-read choice
+        echo -ne "${CYAN}Select an option: ${NC}"
+        read choice
         case $choice in
             1) install_node; return_to_menu ;;
             2) upload_file ;;
@@ -1001,4 +1126,4 @@ read choice
     done
 }
 
-main_menu 
+main_menu  
