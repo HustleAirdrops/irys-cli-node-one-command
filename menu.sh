@@ -826,7 +826,7 @@ add_fund() {
     echo -ne "${CYAN}Enter amount in ETH to deposit: ${NC}"
     read eth_amount
     amount=$(awk "BEGIN {printf \"%.0f\n\", $eth_amount * 1000000000000000000}")
-    irys fund "$amount" -n devnet -t ethereum -w "$PRIVATE_KEY" --provider-url "$RPC_URL" 2>&1 | tee -a "$LOG_FILE"
+    irys fund "$amount" -n devnet -t ethereum -w "$PRIVATE_KEY" --provider-url "$RPC_URL"
 }
 
 # Check balance
